@@ -735,6 +735,73 @@ const METRICS = [
 ];
 let metric = 'weight';
 function bmiOf(w) { const h = num(S.profile.height); return h && w ? Math.round((w / (h / 100) ** 2) * 10) / 10 : null; }
+// ---------- 결과지 사진 (IndexedDB, 이 폰에만 저장) ----------
+const PhotoDB = (() => {
+  let dbp;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('ounwan-photos', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('p');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const run = async (mode, fn) => { const db = await open(); return new Promise((res, rej) => {
+    const t = db.transaction('p', mode); const req = fn(t.objectStore('p'));
+    t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+  }); };
+  return {
+    get: (k) => run('readonly', (st) => st.get(k)),
+    set: (k, v) => run('readwrite', (st) => st.put(v, k)),
+    del: (k) => run('readwrite', (st) => st.delete(k)),
+    clear: () => run('readwrite', (st) => st.clear()),
+    all: async () => { const db = await open(); return new Promise((res, rej) => {
+      const out = {}; const t = db.transaction('p'); const c = t.objectStore('p').openCursor();
+      c.onsuccess = () => { const cur = c.result; if (cur) { out[cur.key] = cur.value; cur.continue(); } };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
+    }); },
+  };
+})();
+// 긴 변 1600px JPEG로 줄여서 숫자는 또렷하게, 용량은 수백 KB로
+function shrinkImage(file, max = 1600) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('img')); };
+    img.src = url;
+  });
+}
+function openPhotoView(src, title) {
+  $('#photoFull').src = src; $('#photoFull').classList.remove('zoom');
+  $('#photoTitle').textContent = title;
+  $('#photoDialog').showModal();
+}
+async function showPhoto(date) {
+  const d = await PhotoDB.get(date).catch(() => null);
+  if (!d) { toast('사진을 찾지 못했어요'); return; }
+  openPhotoView(d, longDate(date) + ' 결과지');
+}
+$('#photoFull').addEventListener('click', () => $('#photoFull').classList.toggle('zoom'));
+// null = 그대로, '' = 사진 빼기, dataURL = 새 사진
+let pendingPhoto = null;
+function setPhotoPreview(d) {
+  $('#ibPhotoPrev').hidden = !d; $('#ibPhotoBtn').hidden = !!d;
+  if (d) $('#ibPhotoImg').src = d;
+}
+$('#ibPhoto').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try { pendingPhoto = await shrinkImage(f); setPhotoPreview(pendingPhoto); }
+  catch (err) { alert('사진을 불러오지 못했어요. 다른 사진으로 해볼까요?'); }
+});
+$('#ibPhotoDel').addEventListener('click', () => { pendingPhoto = ''; setPhotoPreview(null); });
+$('#ibPhotoImg').addEventListener('click', () => { if (pendingPhoto) openPhotoView(pendingPhoto, '미리보기'); });
+document.addEventListener('click', (e) => { const p = e.target.closest('[data-photo]'); if (p) showPhoto(p.dataset.photo); });
+
 const bmiLabel = (b) => (b < 18.5 ? '저체중' : b < 23 ? '정상' : b < 25 ? '과체중' : '비만');
 function fatLabel(p) { const [lo, hi] = S.profile.sex === 'f' ? [18, 28] : [10, 20]; return p < lo ? '표준 이하' : p <= hi ? '표준' : '표준 이상'; }
 function renderBody() {
@@ -763,12 +830,13 @@ function renderBody() {
       </div>
       ${!bmi ? '<p class="muted small">식단 탭에 키를 적으면 BMI도 계산해 드려요.</p>' : ''}
       ${last.memo ? `<p class="muted small">메모: ${esc(last.memo)}</p>` : ''}
+      ${last.photo ? `<button type="button" class="btn ghost wide" data-photo="${last.date}">📷 결과지 사진 보기</button>` : ''}
     </div>`;
   }
   $('#metricChips').innerHTML = METRICS.map((m) => `<button type="button" data-metric="${m.k}" class="${m.k === metric ? 'on' : ''}">${m.label}</button>`).join('');
   renderBodyChart();
   $('#inbodyList').innerHTML = list.length ? `<div class="card"><h2>전체 기록</h2>${list.slice().reverse().map((r) => `
-    <div class="ib-row"><div><strong>${longDate(r.date)}</strong><br><span class="muted small">
+    <div class="ib-row">${r.photo ? `<button type="button" class="ib-thumb" data-photo="${r.date}" aria-label="결과지 사진 보기">📷</button>` : ''}<div class="grow"><strong>${longDate(r.date)}</strong><br><span class="muted small">
       ${fmt(r.weight)}kg${r.smm != null ? ` · 골격근 ${fmt(r.smm)}kg` : ''}${r.fatPct != null ? ` · 체지방 ${fmt(r.fatPct)}%` : ''}</span></div>
       <button class="icon-del" data-delib="${r.id}" aria-label="삭제">✕</button></div>`).join('')}</div>` : '';
 }
@@ -781,7 +849,10 @@ function renderBodyChart() {
 $('#metricChips').addEventListener('click', (e) => { const b = e.target.closest('[data-metric]'); if (b) { metric = b.dataset.metric; renderBody(); } });
 $('#inbodyList').addEventListener('click', (e) => {
   const b = e.target.closest('[data-delib]');
-  if (!b || !confirm('이 기록을 삭제할까요?')) return;
+  if (!b) return;
+  const rec = S.inbody.find((r) => r.id === b.dataset.delib);
+  if (!confirm(rec && rec.photo ? '이 기록과 결과지 사진을 삭제할까요?' : '이 기록을 삭제할까요?')) return;
+  if (rec && rec.photo) PhotoDB.del(rec.date).catch(() => {});
   S.inbody = S.inbody.filter((r) => r.id !== b.dataset.delib); save(); renderBody();
 });
 function openInbody() {
@@ -790,11 +861,12 @@ function openInbody() {
   const last = latestInbody();
   $('#ibWeight').placeholder = last ? `지난번 ${fmt(last.weight)}` : '';
   $('#ibMore').open = false;
+  pendingPhoto = null; setPhotoPreview(null);
   $('#inbodyDialog').showModal();
 }
 $('#addInbody').addEventListener('click', () => { openInbody(); $('#ibMore').open = true; });
-$('#inbodyDialog').addEventListener('close', () => {
-  if ($('#inbodyDialog').returnValue !== 'ok') return;
+$('#inbodyDialog').addEventListener('close', async () => {
+  if ($('#inbodyDialog').returnValue !== 'ok') { pendingPhoto = null; return; }
   const weight = num($('#ibWeight').value);
   if (!weight) return;
   const fatPct = num($('#ibFatPct').value);
@@ -803,6 +875,14 @@ $('#inbodyDialog').addEventListener('close', () => {
   const rec = { id: uid(), date: $('#ibDate').value || ymd(), weight, smm: num($('#ibSmm').value), fatPct, fatKg,
     visceral: num($('#ibVisceral').value), bmr: num($('#ibBmr').value), memo: $('#ibMemo').value.trim() };
   Object.keys(rec).forEach((k) => (rec[k] == null || rec[k] === '') && delete rec[k]);
+  const same = S.inbody.find((r) => r.date === rec.date);
+  const photo = pendingPhoto; pendingPhoto = null;
+  if (photo) {
+    try { await PhotoDB.set(rec.date, photo); rec.photo = true; }
+    catch (err) { alert('사진 저장 공간이 부족해요. 숫자 기록만 저장할게요.'); }
+  } else if (same && same.photo) {
+    if (photo === '') PhotoDB.del(rec.date).catch(() => {}); else rec.photo = true; // 같은 날 다시 적어도 사진은 유지
+  }
   S.inbody = S.inbody.filter((r) => r.date !== rec.date).concat(rec);
   const last = latestInbody();
   S.profile.weight = String(last.weight);
@@ -918,8 +998,10 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2000);
 }
 $('#openSettings').addEventListener('click', () => $('#settingsDialog').showModal());
-$('#exportBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+$('#exportBtn').addEventListener('click', async () => {
+  const photos = await PhotoDB.all().catch(() => ({}));
+  const data = Object.keys(photos).length ? { ...S, photos } : S;
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `오운완-백업-${ymd()}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -930,13 +1012,19 @@ $('#importFile').addEventListener('change', async (e) => {
     const data = JSON.parse(await file.text());
     if (!data.routines) throw new Error('형식 오류');
     if (!confirm('지금 기록을 백업 파일 내용으로 바꿀까요?')) return;
-    S = migrate(data); save(); $('#settingsDialog').close(); go(currentTab);
+    const photos = data.photos; delete data.photos;
+    S = migrate(data); save();
+    if (photos) {
+      await PhotoDB.clear().catch(() => {});
+      for (const [k, v] of Object.entries(photos)) await PhotoDB.set(k, v).catch(() => {});
+    }
+    $('#settingsDialog').close(); go(currentTab);
   } catch (err) { alert('백업 파일을 읽지 못했어요.'); }
   e.target.value = '';
 });
 $('#resetAll').addEventListener('click', () => {
   if (!confirm('모든 기록을 지울까요? 되돌릴 수 없어요.')) return;
-  S = freshState(); save(); $('#settingsDialog').close(); go('home');
+  S = freshState(); save(); PhotoDB.clear().catch(() => {}); $('#settingsDialog').close(); go('home');
 });
 
 let lastDay = ymd();
