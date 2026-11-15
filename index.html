@@ -17,7 +17,10 @@
       <h1 id="title">오늘</h1>
       <p id="subtitle" class="muted"></p>
     </div>
-    <button class="icon-btn" id="openSettings" aria-label="설정">⚙︎</button>
+    <div class="row gap-s">
+      <button class="icon-btn" id="openTimer" aria-label="휴식 타이머">⏱</button>
+      <button class="icon-btn" id="openSettings" aria-label="설정">⚙︎</button>
+    </div>
   </header>
 
   <main>
@@ -37,10 +40,16 @@
 
     <!-- 기록 -->
     <section data-tab="log" class="tab">
+      <div class="card">
+        <h2>운동별 최고 무게</h2>
+        <select id="exSelect"></select>
+        <div class="stats" id="exStats"></div>
+        <div class="chart" id="exChart"></div>
+      </div>
       <div id="history"></div>
     </section>
 
-    <!-- 타이머 -->
+    <!-- 타이머 (상단 ⏱ 버튼) -->
     <section data-tab="timer" class="tab">
       <div class="timer-wrap">
         <svg viewBox="0 0 200 200" class="ring" aria-hidden="true">
@@ -67,23 +76,64 @@
       </label>
     </section>
 
-    <!-- 그래프 -->
-    <section data-tab="graph" class="tab">
+    <!-- 인바디 -->
+    <section data-tab="body" class="tab">
+      <button class="btn primary wide top-action" id="addInbody">+ 인바디 결과 기록</button>
+      <div id="inbodyLatest"></div>
       <div class="card">
-        <h2>체중</h2>
-        <form id="bodyForm" class="row gap">
-          <input type="number" id="bodyKg" step="0.1" min="20" max="300" inputmode="decimal" placeholder="오늘 체중 (kg)" required>
-          <button class="btn primary">저장</button>
-        </form>
+        <h2>변화 그래프</h2>
+        <div class="chips left" id="metricChips"></div>
         <div class="stats" id="bodyStats"></div>
         <div class="chart" id="bodyChart"></div>
       </div>
+      <details class="card guide">
+        <summary><h2>인바디 보는 법</h2></summary>
+        <div id="inbodyGuide"></div>
+      </details>
+      <div id="inbodyList"></div>
+    </section>
+
+    <!-- 식단 -->
+    <section data-tab="diet" class="tab">
       <div class="card">
-        <h2>운동별 최고 무게</h2>
-        <select id="exSelect"></select>
-        <div class="stats" id="exStats"></div>
-        <div class="chart" id="exChart"></div>
+        <h2>목표</h2>
+        <div class="goal-grid" id="goalChips"></div>
+        <p class="muted small" id="goalDesc"></p>
       </div>
+      <div class="card result" id="dietResult"></div>
+      <div class="card">
+        <h2>내 정보</h2>
+        <form id="profileForm" class="form-grid">
+          <label>성별
+            <select id="pSex"><option value="m">남성</option><option value="f">여성</option></select>
+          </label>
+          <label>나이<input type="number" id="pAge" min="10" max="100" inputmode="numeric" placeholder="세"></label>
+          <label>키 (cm)<input type="number" id="pHeight" min="100" max="230" step="0.1" inputmode="decimal"></label>
+          <label>체중 (kg)<input type="number" id="pWeight" min="25" max="300" step="0.1" inputmode="decimal"></label>
+          <label class="span2">체지방률 (%) <span class="muted">— 알면 더 정확해요</span><input type="number" id="pFat" min="3" max="60" step="0.1" inputmode="decimal" placeholder="선택"></label>
+          <label class="span2">활동량
+            <select id="pActivity">
+              <option value="1.2">거의 안 움직임 (사무직, 운동 X)</option>
+              <option value="1.375">가벼운 활동 (주 1~3회 운동)</option>
+              <option value="1.55">보통 활동 (주 3~5회 운동)</option>
+              <option value="1.725">많은 활동 (주 6~7회 운동)</option>
+              <option value="1.9">매우 많음 (육체노동 + 운동)</option>
+            </select>
+          </label>
+        </form>
+        <p class="muted small">최근 인바디 기록이 있으면 체중·체지방률을 자동으로 채워요.</p>
+      </div>
+      <details class="card guide">
+        <summary><h2>계산 방법</h2></summary>
+        <div id="dietHow"></div>
+      </details>
+    </section>
+
+    <!-- 운동법 -->
+    <section data-tab="guide" class="tab">
+      <input type="search" id="guideSearch" placeholder="운동·근육 검색 (예: 스쿼트, 광배근)" class="search">
+      <div class="chips left scroll" id="partChips"></div>
+      <div id="guideBody"></div>
     </section>
   </main>
 
@@ -93,8 +143,9 @@
   <nav class="tabs">
     <button data-go="today" class="active"><span>✓</span>오늘</button>
     <button data-go="log"><span>☰</span>기록</button>
-    <button data-go="timer"><span>⏱</span>타이머</button>
-    <button data-go="graph"><span>📈</span>그래프</button>
+    <button data-go="body"><span>⚖</span>인바디</button>
+    <button data-go="diet"><span>🍚</span>식단</button>
+    <button data-go="guide"><span>📖</span>운동법</button>
   </nav>
 
   <!-- 세트 추가 -->
@@ -126,10 +177,45 @@
       <div class="chips" id="dayChips"></div>
       <ul id="routineList" class="routine-list"></ul>
       <div class="row gap">
-        <input id="newEx" placeholder="운동 이름 (예: 스쿼트)" class="grow">
+        <input id="newEx" placeholder="운동 이름 (예: 스쿼트)" class="grow" list="exNames">
         <button type="button" class="btn ghost" id="addEx">추가</button>
       </div>
       <div class="row end"><button class="btn primary" value="ok">완료</button></div>
+    </form>
+  </dialog>
+
+  <!-- 운동법 → 루틴에 추가 -->
+  <dialog id="toRoutineDialog">
+    <form method="dialog">
+      <h2 id="toRoutineTitle">루틴에 추가</h2>
+      <p class="muted small">어느 요일에 넣을까요?</p>
+      <div class="chips" id="toRoutineDays"></div>
+      <div class="row gap end">
+        <button class="btn ghost" value="cancel">취소</button>
+        <button class="btn primary" value="ok">추가</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 인바디 입력 -->
+  <dialog id="inbodyDialog">
+    <form method="dialog" id="inbodyForm">
+      <h2>인바디 결과 기록</h2>
+      <p class="muted small">결과지에 있는 숫자만 적으면 돼요. 체중 말고는 비워둬도 괜찮아요.</p>
+      <div class="form-grid">
+        <label class="span2">측정일<input type="date" id="ibDate" required></label>
+        <label>체중 (kg)<input type="number" id="ibWeight" step="0.1" min="20" max="300" inputmode="decimal" required></label>
+        <label>골격근량 (kg)<input type="number" id="ibSmm" step="0.1" min="5" max="100" inputmode="decimal"></label>
+        <label>체지방률 (%)<input type="number" id="ibFatPct" step="0.1" min="2" max="70" inputmode="decimal"></label>
+        <label>체지방량 (kg)<input type="number" id="ibFatKg" step="0.1" min="1" max="200" inputmode="decimal" placeholder="자동 계산"></label>
+        <label>내장지방 레벨<input type="number" id="ibVisceral" step="1" min="1" max="30" inputmode="numeric"></label>
+        <label>기초대사량 (kcal)<input type="number" id="ibBmr" step="1" min="500" max="4000" inputmode="numeric"></label>
+        <label class="span2">메모<input id="ibMemo" placeholder="예: 아침 공복 측정"></label>
+      </div>
+      <div class="row gap end">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="ok">저장</button>
+      </div>
     </form>
   </dialog>
 
@@ -137,7 +223,7 @@
   <dialog id="settingsDialog">
     <form method="dialog">
       <h2>설정</h2>
-      <p class="muted small">기록은 이 폰에만 저장돼요. 폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업해두세요.</p>
+      <p class="muted small">기록은 서버로 보내지 않고 이 폰에만 저장돼요. 나만 볼 수 있지만, 폰을 바꾸거나 브라우저 데이터를 지우면 사라지니 가끔 백업해두세요.</p>
       <button type="button" class="btn ghost wide" id="exportBtn">백업 파일 저장</button>
       <label class="btn ghost wide file-btn">백업 파일 불러오기<input type="file" id="importFile" accept="application/json"></label>
       <button type="button" class="btn danger wide" id="resetAll">모든 기록 지우기</button>
@@ -145,6 +231,7 @@
     </form>
   </dialog>
 
+  <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
