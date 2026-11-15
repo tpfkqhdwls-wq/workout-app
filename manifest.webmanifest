@@ -1,0 +1,14 @@
+{
+  "name": "오운완 노트",
+  "short_name": "오운완",
+  "description": "루틴 체크, 세트 기록, 휴식 타이머, 성장 그래프",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#2f6fed",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

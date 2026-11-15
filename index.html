@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>오운완 노트</title>
+  <meta name="theme-color" content="#2f6fed">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="오운완">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1 id="title">오늘</h1>
+      <p id="subtitle" class="muted"></p>
+    </div>
+    <button class="icon-btn" id="openSettings" aria-label="설정">⚙︎</button>
+  </header>
+
+  <main>
+    <!-- 오늘 -->
+    <section data-tab="today" class="tab active">
+      <div class="card progress-card">
+        <div class="row between">
+          <strong id="progressText">0 / 0 완료</strong>
+          <button class="link" id="editRoutine">루틴 편집</button>
+        </div>
+        <div class="bar"><span id="progressBar"></span></div>
+      </div>
+      <ul id="todayList" class="ex-list"></ul>
+      <p id="restDay" class="empty hidden">오늘은 루틴이 없어요. 쉬는 날이거나, 아래에서 운동을 추가하세요.</p>
+      <button class="btn ghost wide" id="addOther">+ 다른 운동 기록</button>
+    </section>
+
+    <!-- 기록 -->
+    <section data-tab="log" class="tab">
+      <div id="history"></div>
+    </section>
+
+    <!-- 타이머 -->
+    <section data-tab="timer" class="tab">
+      <div class="timer-wrap">
+        <svg viewBox="0 0 200 200" class="ring" aria-hidden="true">
+          <circle cx="100" cy="100" r="88" class="ring-bg"/>
+          <circle cx="100" cy="100" r="88" class="ring-fg" id="ringFg"/>
+        </svg>
+        <div class="timer-text">
+          <div id="timerTime">1:30</div>
+          <div class="muted" id="timerState">휴식 준비</div>
+        </div>
+      </div>
+      <div class="chips" id="presets">
+        <button data-sec="30">30초</button><button data-sec="60">1분</button><button data-sec="90">1분 30초</button><button data-sec="120">2분</button><button data-sec="180">3분</button>
+      </div>
+      <div class="row center gap">
+        <button class="btn ghost" id="minus10">−10초</button>
+        <button class="btn primary big" id="startPause">시작</button>
+        <button class="btn ghost" id="plus10">+10초</button>
+      </div>
+      <button class="link center-block" id="resetTimer">초기화</button>
+      <label class="toggle card">
+        <span>세트 기록하면 휴식 타이머 자동 시작</span>
+        <input type="checkbox" id="autoRest">
+      </label>
+    </section>
+
+    <!-- 그래프 -->
+    <section data-tab="graph" class="tab">
+      <div class="card">
+        <h2>체중</h2>
+        <form id="bodyForm" class="row gap">
+          <input type="number" id="bodyKg" step="0.1" min="20" max="300" inputmode="decimal" placeholder="오늘 체중 (kg)" required>
+          <button class="btn primary">저장</button>
+        </form>
+        <div class="stats" id="bodyStats"></div>
+        <div class="chart" id="bodyChart"></div>
+      </div>
+      <div class="card">
+        <h2>운동별 최고 무게</h2>
+        <select id="exSelect"></select>
+        <div class="stats" id="exStats"></div>
+        <div class="chart" id="exChart"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 다른 탭에서 타이머가 돌 때 보이는 알림 -->
+  <button id="timerPill" class="timer-pill hidden"></button>
+
+  <nav class="tabs">
+    <button data-go="today" class="active"><span>✓</span>오늘</button>
+    <button data-go="log"><span>☰</span>기록</button>
+    <button data-go="timer"><span>⏱</span>타이머</button>
+    <button data-go="graph"><span>📈</span>그래프</button>
+  </nav>
+
+  <!-- 세트 추가 -->
+  <dialog id="setDialog">
+    <form method="dialog" id="setForm">
+      <h2>세트 기록</h2>
+      <label>운동<input id="setEx" list="exNames" required autocomplete="off"></label>
+      <datalist id="exNames"></datalist>
+      <div class="row gap">
+        <label class="grow">무게 (kg)
+          <div class="stepper"><button type="button" data-step="setW:-2.5">−</button><input type="number" id="setW" step="0.5" min="0" inputmode="decimal"><button type="button" data-step="setW:2.5">+</button></div>
+        </label>
+        <label class="grow">횟수
+          <div class="stepper"><button type="button" data-step="setR:-1">−</button><input type="number" id="setR" step="1" min="1" inputmode="numeric" required><button type="button" data-step="setR:1">+</button></div>
+        </label>
+      </div>
+      <p class="muted small" id="setHint"></p>
+      <div class="row gap end">
+        <button class="btn ghost" value="cancel" formnovalidate>취소</button>
+        <button class="btn primary" value="ok">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 루틴 편집 -->
+  <dialog id="routineDialog">
+    <form method="dialog">
+      <h2>요일별 루틴</h2>
+      <div class="chips" id="dayChips"></div>
+      <ul id="routineList" class="routine-list"></ul>
+      <div class="row gap">
+        <input id="newEx" placeholder="운동 이름 (예: 스쿼트)" class="grow">
+        <button type="button" class="btn ghost" id="addEx">추가</button>
+      </div>
+      <div class="row end"><button class="btn primary" value="ok">완료</button></div>
+    </form>
+  </dialog>
+
+  <!-- 설정 -->
+  <dialog id="settingsDialog">
+    <form method="dialog">
+      <h2>설정</h2>
+      <p class="muted small">기록은 이 폰에만 저장돼요. 폰을 바꾸거나 브라우저 데이터를 지우기 전에 백업해두세요.</p>
+      <button type="button" class="btn ghost wide" id="exportBtn">백업 파일 저장</button>
+      <label class="btn ghost wide file-btn">백업 파일 불러오기<input type="file" id="importFile" accept="application/json"></label>
+      <button type="button" class="btn danger wide" id="resetAll">모든 기록 지우기</button>
+      <div class="row end"><button class="btn primary" value="ok">닫기</button></div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
